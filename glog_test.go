@@ -382,9 +382,9 @@ func TestDeleteOldFile(t *testing.T) {
 	MaxSize = 512
 	MaxFileCount = 2
 	var logFileCount = 0
-	logFileCount, err = deleteOldLogFile(severityName[infoLog])
+	logFileCount, err = deleteOldLogFile(severityName[infoLog], MaxFileCount)
 	for logFileCount > MaxFileCount {
-		logFileCount, err = deleteOldLogFile(severityName[infoLog])
+		logFileCount, err = deleteOldLogFile(severityName[infoLog], MaxFileCount)
 	}
 
 	Info("x") // Be sure we have a file.
@@ -442,7 +442,7 @@ func TestDeleteOldFile(t *testing.T) {
 		t.Errorf("info.f.Name did not change: %v", fname0)
 	}
 
-	logFileCount, err = deleteOldLogFile(severityName[infoLog])
+	logFileCount, err = deleteOldLogFile(severityName[infoLog], MaxFileCount)
 
 	if err != nil {
 		t.Fatalf("failed to delete old log file: %v", err)

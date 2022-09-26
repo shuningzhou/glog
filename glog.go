@@ -838,10 +838,23 @@ func (sb *syncBuffer) rotateFile(now time.Time) error {
 		return err
 	}
 
-	_, err = deleteOldLogFile(severityName[sb.sev])
+	maxFileCount := MaxFileCount
+	if maxFileCount < 2 {
+		maxFileCount = 2
+	}
 
-	if err != nil {
-		return err
+	logFileCount := maxFileCount + 1 //force to enter the for loop at least once
+	safety := 10
+
+	for logFileCount > maxFileCount {
+		logFileCount, err = deleteOldLogFile(severityName[infoLog], maxFileCount)
+		if err != nil {
+			return err
+		}
+		safety--
+		if safety < 0 {
+			break
+		}
 	}
 
 	sb.Writer = bufio.NewWriterSize(sb.file, bufferSize)

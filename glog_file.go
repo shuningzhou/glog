@@ -133,7 +133,7 @@ func create(tag string, t time.Time) (f *os.File, filename string, err error) {
 	return nil, "", fmt.Errorf("log: cannot create log: %v", lastErr)
 }
 
-func deleteOldLogFile(tag string) (count int, err error) {
+func deleteOldLogFile(tag string, maxFileCount int) (count int, err error) {
 	onceLogDirs.Do(createLogDirs)
 	if len(logDirs) == 0 {
 		return 0, errors.New("log: no log dirs")
@@ -175,7 +175,7 @@ func deleteOldLogFile(tag string) (count int, err error) {
 		}
 	}
 
-	if logFileCount > MaxFileCount {
+	if logFileCount > maxFileCount {
 		if fileToDelete != nil {
 			err := os.Remove(filepath.Join(logDir, fileToDelete.Name()))
 			if err != nil {
