@@ -22,6 +22,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -32,6 +33,7 @@ import (
 
 // MaxSize is the maximum size of a log file in bytes.
 var MaxSize uint64 = 1024 * 1024 * 1800
+var MaxFileCount int = 3
 
 // logDirs lists the candidate directories for new log files.
 var logDirs []string
@@ -96,6 +98,14 @@ func logName(tag string, t time.Time) (name, link string) {
 	return name, program + "." + tag
 }
 
+func logPrefix(tag string) string {
+	return fmt.Sprintf("%s.%s.%s.log.%s.",
+		program,
+		host,
+		userName,
+		tag)
+}
+
 var onceLogDirs sync.Once
 
 // create creates a new log file and returns the file and its filename, which
@@ -121,4 +131,58 @@ func create(tag string, t time.Time) (f *os.File, filename string, err error) {
 		lastErr = err
 	}
 	return nil, "", fmt.Errorf("log: cannot create log: %v", lastErr)
+}
+
+func deleteOldLogFile(tag string) (count int, err error) {
+	onceLogDirs.Do(createLogDirs)
+	if len(logDirs) == 0 {
+		return 0, errors.New("log: no log dirs")
+	}
+	prefix := logPrefix(tag)
+
+	logFileCount := 0
+	var fileToDelete os.FileInfo
+	var foundDir = false
+	var logDir string
+
+	for _, dir := range logDirs {
+		files, err := ioutil.ReadDir(dir)
+		if err != nil {
+			continue
+		}
+
+		if foundDir {
+			break
+		}
+
+		for _, file := range files {
+			if !file.Mode().IsRegular() {
+				continue
+			}
+			if strings.HasPrefix(file.Name(), prefix) {
+				foundDir = true
+				logDir = dir
+				logFileCount++
+
+				if fileToDelete == nil {
+					fileToDelete = file
+				} else {
+					if fileToDelete.ModTime().After(file.ModTime()) {
+						fileToDelete = file
+					}
+				}
+			}
+		}
+	}
+
+	if logFileCount > MaxFileCount {
+		if fileToDelete != nil {
+			err := os.Remove(filepath.Join(logDir, fileToDelete.Name()))
+			if err != nil {
+				return logFileCount, err
+			}
+		}
+	}
+
+	return logFileCount, nil
 }

@@ -371,6 +371,88 @@ func TestRollover(t *testing.T) {
 	}
 }
 
+func TestDeleteOldFile(t *testing.T) {
+	setFlags()
+	var err error
+	defer func(previous func(error)) { logExitFunc = previous }(logExitFunc)
+	logExitFunc = func(e error) {
+		err = e
+	}
+	defer func(previous uint64) { MaxSize = previous }(MaxSize)
+	MaxSize = 512
+	MaxFileCount = 2
+	var logFileCount = 0
+	logFileCount, err = deleteOldLogFile(severityName[infoLog])
+	for logFileCount > MaxFileCount {
+		logFileCount, err = deleteOldLogFile(severityName[infoLog])
+	}
+
+	Info("x") // Be sure we have a file.
+	info, ok := logging.file[infoLog].(*syncBuffer)
+	if !ok {
+		t.Fatal("info wasn't created")
+	}
+	if err != nil {
+		t.Fatalf("info has initial error: %v", err)
+	}
+	fname0 := info.file.Name()
+	Info(strings.Repeat("x", int(MaxSize))) // force a rollover
+	if err != nil {
+		t.Fatalf("info has error after big write: %v", err)
+	}
+
+	time.Sleep(1 * time.Second)
+
+	Info("x") // create a new file
+	if err != nil {
+		t.Fatalf("error after rotation: %v", err)
+	}
+	fname1 := info.file.Name()
+	if fname0 == fname1 {
+		t.Errorf("info.f.Name did not change: %v", fname0)
+	}
+	Info(strings.Repeat("x", int(MaxSize))) // force a rollover
+	if err != nil {
+		t.Fatalf("info has error after big write: %v", err)
+	}
+
+	time.Sleep(1 * time.Second)
+
+	Info("x") // create a new file
+	if err != nil {
+		t.Fatalf("error after rotation: %v", err)
+	}
+	fname2 := info.file.Name()
+	if fname2 == fname1 {
+		t.Errorf("info.f.Name did not change: %v", fname0)
+	}
+	Info(strings.Repeat("x", int(MaxSize))) // force a rollover
+	if err != nil {
+		t.Fatalf("info has error after big write: %v", err)
+	}
+
+	time.Sleep(1 * time.Second)
+
+	Info("x") // create a new file
+	if err != nil {
+		t.Fatalf("error after rotation: %v", err)
+	}
+	fname3 := info.file.Name()
+	if fname3 == fname2 {
+		t.Errorf("info.f.Name did not change: %v", fname0)
+	}
+
+	logFileCount, err = deleteOldLogFile(severityName[infoLog])
+
+	if err != nil {
+		t.Fatalf("failed to delete old log file: %v", err)
+	}
+
+	if logFileCount != MaxFileCount {
+		t.Fatalf("log file count not equal to MaxFileCount: %d", logFileCount)
+	}
+}
+
 func TestLogBacktraceAt(t *testing.T) {
 	setFlags()
 	defer logging.swap(logging.newBuffers())

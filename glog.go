@@ -838,6 +838,12 @@ func (sb *syncBuffer) rotateFile(now time.Time) error {
 		return err
 	}
 
+	_, err = deleteOldLogFile(severityName[sb.sev])
+
+	if err != nil {
+		return err
+	}
+
 	sb.Writer = bufio.NewWriterSize(sb.file, bufferSize)
 
 	// Write header.
@@ -848,6 +854,7 @@ func (sb *syncBuffer) rotateFile(now time.Time) error {
 	fmt.Fprintf(&buf, "Log line format: [IWEF]mmdd hh:mm:ss.uuuuuu threadid file:line] msg\n")
 	n, err := sb.file.Write(buf.Bytes())
 	sb.nbytes += uint64(n)
+
 	return err
 }
 
