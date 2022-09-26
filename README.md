@@ -34,3 +34,5 @@ glog.V(2).Infoln("Processed", nItems, "elements")
 The repository contains an open source version of the log package used inside Google. The master copy of the source lives inside Google, not here. The code in this repo is for export only and is not itself under development. Feature requests will be ignored.
 
 Send bug reports to golang-nuts@googlegroups.com.
+
+
