@@ -594,7 +594,7 @@ func (l *loggingT) createEntry(s severity, depth int, entry GLogEntry) (*buffer,
 	fileEntry := GLogFileEntry{
 		Level:      severityName[s],
 		Date:       fmt.Sprintf("%02d%02d", int(month), day),
-		Time:       fmt.Sprintf("%02d:%02d:%02d:%05d", hour, minute, second, ms),
+		Time:       fmt.Sprintf("%02d:%02d:%02d.%05d", hour, minute, second, ms),
 		Line:       fmt.Sprintf("%s:%d", file, line),
 		ActivityID: entry.GetActivityID(),
 		Category:   entry.GetCategory(),
