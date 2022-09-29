@@ -73,6 +73,7 @@ package glog
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -87,6 +88,22 @@ import (
 	"sync/atomic"
 	"time"
 )
+
+type GLogEntry interface {
+	GetActivityID() string
+	GetCategory() string
+	GetMessage() string
+}
+
+type GLogFileEntry struct {
+	Level      string `json:"Level"`
+	Date       string `json:"Date"`
+	Time       string `json:"Time"`
+	Line       string `json:"Line"`
+	ActivityID string `json:"ActivityID"`
+	Category   string `json:"Category"`
+	Message    string `json:"Message"`
+}
 
 // severity identifies the sort of log: info, warning etc. It also implements
 // the flag.Value interface. The -stderrthreshold flag is of type severity and
@@ -546,6 +563,52 @@ func (l *loggingT) header(s severity, depth int) (*buffer, string, int) {
 	return l.formatHeader(s, file, line), file, line
 }
 
+func (l *loggingT) createEntry(s severity, depth int, entry GLogEntry) (*buffer, string, int) {
+	_, file, line, ok := runtime.Caller(3 + depth)
+	if !ok {
+		file = "???"
+		line = 1
+	} else {
+		slash := strings.LastIndex(file, "/")
+		if slash >= 0 {
+			file = file[slash+1:]
+		}
+	}
+
+	now := timeNow()
+	if line < 0 {
+		line = 0 // not a real line number, but acceptable to someDigits
+	}
+	if s > fatalLog {
+		s = infoLog // for safety.
+	}
+	buf := l.getBuffer()
+
+	// Avoid Fprintf, for speed. The format is so simple that we can do it quickly by hand.
+	// It's worth about 3X. Fprintf is hard.
+	_, month, day := now.Date()
+	hour, minute, second := now.Clock()
+	ms := now.Nanosecond() / 1000
+
+	//todo: performance
+	fileEntry := GLogFileEntry{
+		Level:      severityName[s],
+		Date:       fmt.Sprintf("%02d%02d", int(month), day),
+		Time:       fmt.Sprintf("%02d:%02d:%02d:%05d", hour, minute, second, ms),
+		Line:       fmt.Sprintf("%s:%d", file, line),
+		ActivityID: entry.GetActivityID(),
+		Category:   entry.GetCategory(),
+		Message:    entry.GetMessage(),
+	}
+
+	b, _ := json.Marshal(fileEntry)
+
+	buf.Write(b)
+	buf.WriteByte(',')
+
+	return buf, file, line
+}
+
 // formatHeader formats a log header using the provided file name and line number.
 func (l *loggingT) formatHeader(s severity, file string, line int) *buffer {
 	now := timeNow()
@@ -646,6 +709,18 @@ func (l *loggingT) printDepth(s severity, depth int, args ...interface{}) {
 	l.output(s, buf, file, line, false)
 }
 
+func (l *loggingT) printDepthEntry(s severity, depth int, arg interface{}) {
+	if e, ok := arg.(GLogEntry); ok {
+		buf, file, line := l.createEntry(s, depth, e)
+
+		if buf.Bytes()[buf.Len()-1] != '\n' {
+			buf.WriteByte('\n')
+		}
+
+		l.output(s, buf, file, line, false)
+	}
+}
+
 func (l *loggingT) printf(s severity, format string, args ...interface{}) {
 	buf, file, line := l.header(s, 0)
 	fmt.Fprintf(buf, format, args...)
@@ -702,7 +777,10 @@ func (l *loggingT) output(s severity, buf *buffer, file string, line int, alsoTo
 			l.file[warningLog].Write(data)
 			fallthrough
 		case infoLog:
-			l.file[infoLog].Write(data)
+			if _, err := l.file[infoLog].Write(data); err != nil {
+				fmt.Fprintln(os.Stderr, "glog: failed to log")
+			}
+
 		}
 	}
 	if s == fatalLog {
@@ -864,7 +942,8 @@ func (sb *syncBuffer) rotateFile(now time.Time) error {
 	fmt.Fprintf(&buf, "Log file created at: %s\n", now.Format("2006/01/02 15:04:05"))
 	fmt.Fprintf(&buf, "Running on machine: %s\n", host)
 	fmt.Fprintf(&buf, "Binary: Built with %s %s for %s/%s\n", runtime.Compiler, runtime.Version(), runtime.GOOS, runtime.GOARCH)
-	fmt.Fprintf(&buf, "Log line format: [IWEF]mmdd hh:mm:ss.uuuuuu threadid file:line] msg\n")
+	fmt.Fprintf(&buf, "--------------------|JSON|--------------------\n")
+	// fmt.Fprintf(&buf, "Log line format: [IWEF]mmdd hh:mm:ss.uuuuuu threadid file:line] msg\n")
 	n, err := sb.file.Write(buf.Bytes())
 	sb.nbytes += uint64(n)
 
@@ -1073,6 +1152,10 @@ func (v Verbose) Infof(format string, args ...interface{}) {
 // Arguments are handled in the manner of fmt.Print; a newline is appended if missing.
 func Info(args ...interface{}) {
 	logging.print(infoLog, args...)
+}
+
+func InfoEntryDepth(depth int, arg interface{}) {
+	logging.printDepthEntry(infoLog, depth, arg)
 }
 
 // InfoDepth acts as Info but uses depth to determine which call frame to log.

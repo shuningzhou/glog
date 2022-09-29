@@ -83,26 +83,21 @@ func shortHostname(hostname string) string {
 // logName returns a new log file name containing tag, with start time t, and
 // the name for the symlink for tag.
 func logName(tag string, t time.Time) (name, link string) {
-	name = fmt.Sprintf("%s.%s.%s.log.%s.%04d%02d%02d-%02d%02d%02d.%d",
+	name = fmt.Sprintf("%s_%s_%04d%02d%02d_%02d%02d%02d.txt",
 		program,
-		host,
-		userName,
 		tag,
 		t.Year(),
 		t.Month(),
 		t.Day(),
 		t.Hour(),
 		t.Minute(),
-		t.Second(),
-		pid)
+		t.Second())
 	return name, program + "." + tag
 }
 
 func logPrefix(tag string) string {
-	return fmt.Sprintf("%s.%s.%s.log.%s.",
+	return fmt.Sprintf("%s_%s",
 		program,
-		host,
-		userName,
 		tag)
 }
 
@@ -117,15 +112,12 @@ func create(tag string, t time.Time) (f *os.File, filename string, err error) {
 	if len(logDirs) == 0 {
 		return nil, "", errors.New("log: no log dirs")
 	}
-	name, link := logName(tag, t)
+	name, _ := logName(tag, t)
 	var lastErr error
 	for _, dir := range logDirs {
 		fname := filepath.Join(dir, name)
 		f, err := os.Create(fname)
 		if err == nil {
-			symlink := filepath.Join(dir, link)
-			os.Remove(symlink)        // ignore err
-			os.Symlink(name, symlink) // ignore err
 			return f, fname, nil
 		}
 		lastErr = err

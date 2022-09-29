@@ -495,3 +495,81 @@ func BenchmarkHeader(b *testing.B) {
 		logging.putBuffer(buf)
 	}
 }
+
+//entry logging
+type testLogEntry struct {
+	ActivityID string
+	Category   string
+	Message    string
+}
+
+func (e testLogEntry) GetActivityID() string {
+	return e.ActivityID
+}
+
+func (e testLogEntry) GetCategory() string {
+	return e.Category
+}
+
+func (e testLogEntry) GetMessage() string {
+	return e.Message
+}
+
+func TestInfoEntryDepth(t *testing.T) {
+	// MaxSize = 512
+	// MaxFileCount = 2
+	setFlags()
+	//defer logging.swap(logging.newBuffers())
+	InfoEntryDepth(1, testLogEntry{ActivityID: "abcd", Category: "A", Message: "testMessage1"})
+	// InfoEntryDepth(1, testLogEntry{ActivityID: "abcd", Category: "A", Message: "testMessage2"})
+	// InfoEntryDepth(1, testLogEntry{ActivityID: "abcd", Category: "A", Message: "testMessage3"})
+	// InfoEntryDepth(1, testLogEntry{ActivityID: "abcd", Category: "A", Message: "testMessage3"})
+	// InfoEntryDepth(1, testLogEntry{ActivityID: "abcd", Category: "A", Message: "testMessage3"})
+	// InfoEntryDepth(1, testLogEntry{ActivityID: "abcd", Category: "A", Message: "testMessage3"})
+	// InfoEntryDepth(1, testLogEntry{ActivityID: "abcd", Category: "A", Message: "testMessage3"})
+	// InfoEntryDepth(1, testLogEntry{ActivityID: "abcd", Category: "A", Message: "testMessage3"})
+	// InfoEntryDepth(1, testLogEntry{ActivityID: "abcd", Category: "A", Message: "testMessage3"})
+
+	// if !contains(infoLog, "INFO", t) {
+	// 	t.Errorf("Info has wrong character: %q", contents(infoLog))
+	// }
+}
+
+func TestDeleteOldFile1(t *testing.T) {
+	setFlags()
+	var err error
+	defer func(previous func(error)) { logExitFunc = previous }(logExitFunc)
+	logExitFunc = func(e error) {
+		err = e
+	}
+	defer func(previous uint64) { MaxSize = previous }(MaxSize)
+	MaxSize = 1024 * 1024 * 8
+	MaxFileCount = 2
+	var logFileCount = 0
+	logFileCount, err = deleteOldLogFile(severityName[infoLog], MaxFileCount)
+	for logFileCount > MaxFileCount {
+		logFileCount, err = deleteOldLogFile(severityName[infoLog], MaxFileCount)
+	}
+
+	//Info("x")
+	for i := 0; i < 100; i++ {
+		InfoEntryDepth(1, testLogEntry{ActivityID: "abcd" + strconv.Itoa(i), Category: "A", Message: strings.Repeat("x", int(200)) + " testMessage" + strconv.Itoa(i)})
+	}
+
+	_, ok := logging.file[infoLog].(*syncBuffer)
+
+	if !ok {
+		t.Fatal("info wasn't created")
+	}
+	if err != nil {
+		t.Fatalf("info has initial error: %v", err)
+	}
+
+	// InfoEntryDepth(1, testLogEntry{ActivityID: "abcd5", Category: "A", Message: strings.Repeat("x", int(MaxSize))})
+	// //Info(strings.Repeat("x", int(MaxSize))) // force a rollover
+	// if err != nil {
+	// 	t.Fatalf("info has error after big write: %v", err)
+	// }
+	Flush()
+	//time.Sleep(5 * time.Second)
+}
