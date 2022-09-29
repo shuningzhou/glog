@@ -18,6 +18,7 @@ package glog
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	stdLog "log"
 	"path/filepath"
@@ -206,13 +207,6 @@ func TestError(t *testing.T) {
 	if !contains(errorLog, "test", t) {
 		t.Error("Error failed")
 	}
-	str := contents(errorLog)
-	if !contains(warningLog, str, t) {
-		t.Error("Warning failed")
-	}
-	if !contains(infoLog, str, t) {
-		t.Error("Info failed")
-	}
 }
 
 // Test that a Warning log goes to Info.
@@ -227,10 +221,6 @@ func TestWarning(t *testing.T) {
 	}
 	if !contains(warningLog, "test", t) {
 		t.Error("Warning failed")
-	}
-	str := contents(warningLog)
-	if !contains(infoLog, str, t) {
-		t.Error("Info failed")
 	}
 }
 
@@ -515,61 +505,33 @@ func (e testLogEntry) GetMessage() string {
 	return e.Message
 }
 
-func TestInfoEntryDepth(t *testing.T) {
-	// MaxSize = 512
-	// MaxFileCount = 2
+func TestInfoStructuredDepth(t *testing.T) {
 	setFlags()
-	//defer logging.swap(logging.newBuffers())
-	InfoEntryDepth(1, testLogEntry{ActivityID: "abcd", Category: "A", Message: "testMessage1"})
-	// InfoEntryDepth(1, testLogEntry{ActivityID: "abcd", Category: "A", Message: "testMessage2"})
-	// InfoEntryDepth(1, testLogEntry{ActivityID: "abcd", Category: "A", Message: "testMessage3"})
-	// InfoEntryDepth(1, testLogEntry{ActivityID: "abcd", Category: "A", Message: "testMessage3"})
-	// InfoEntryDepth(1, testLogEntry{ActivityID: "abcd", Category: "A", Message: "testMessage3"})
-	// InfoEntryDepth(1, testLogEntry{ActivityID: "abcd", Category: "A", Message: "testMessage3"})
-	// InfoEntryDepth(1, testLogEntry{ActivityID: "abcd", Category: "A", Message: "testMessage3"})
-	// InfoEntryDepth(1, testLogEntry{ActivityID: "abcd", Category: "A", Message: "testMessage3"})
-	// InfoEntryDepth(1, testLogEntry{ActivityID: "abcd", Category: "A", Message: "testMessage3"})
+	defer logging.swap(logging.newBuffers())
+	InfoStructuredDepth(1, testLogEntry{ActivityID: "abcd", Category: "A", Message: "testMessage1"})
 
-	// if !contains(infoLog, "INFO", t) {
-	// 	t.Errorf("Info has wrong character: %q", contents(infoLog))
-	// }
-}
+	s := contents(infoLog)
+	s = strings.TrimSuffix(s, ",\n")
+	entry := GLogFileEntry{}
+	err := json.Unmarshal([]byte(s), &entry)
 
-func TestDeleteOldFile1(t *testing.T) {
-	setFlags()
-	var err error
-	defer func(previous func(error)) { logExitFunc = previous }(logExitFunc)
-	logExitFunc = func(e error) {
-		err = e
-	}
-	defer func(previous uint64) { MaxSize = previous }(MaxSize)
-	MaxSize = 1024 * 1024 * 8
-	MaxFileCount = 2
-	var logFileCount = 0
-	logFileCount, err = deleteOldLogFile(severityName[infoLog], MaxFileCount)
-	for logFileCount > MaxFileCount {
-		logFileCount, err = deleteOldLogFile(severityName[infoLog], MaxFileCount)
-	}
-
-	//Info("x")
-	for i := 0; i < 100; i++ {
-		InfoEntryDepth(1, testLogEntry{ActivityID: "abcd" + strconv.Itoa(i), Category: "A", Message: strings.Repeat("x", int(200)) + " testMessage" + strconv.Itoa(i)})
-	}
-
-	_, ok := logging.file[infoLog].(*syncBuffer)
-
-	if !ok {
-		t.Fatal("info wasn't created")
-	}
 	if err != nil {
-		t.Fatalf("info has initial error: %v", err)
+		t.Fatalf("error json.unmarshal: %v", err)
 	}
 
-	// InfoEntryDepth(1, testLogEntry{ActivityID: "abcd5", Category: "A", Message: strings.Repeat("x", int(MaxSize))})
-	// //Info(strings.Repeat("x", int(MaxSize))) // force a rollover
-	// if err != nil {
-	// 	t.Fatalf("info has error after big write: %v", err)
-	// }
-	Flush()
-	//time.Sleep(5 * time.Second)
+	if entry.Level != "INFO" {
+		t.Errorf("Wrong level: %q", entry.Level)
+	}
+
+	if entry.ActivityID != "abcd" {
+		t.Errorf("Wrong ActivityID: %q", entry.ActivityID)
+	}
+
+	if entry.Category != "A" {
+		t.Errorf("Wrong Category: %q", entry.Category)
+	}
+
+	if entry.Message != "testMessage1" {
+		t.Errorf("Wrong Message: %q", entry.Message)
+	}
 }

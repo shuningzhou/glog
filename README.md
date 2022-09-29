@@ -35,4 +35,5 @@ The repository contains an open source version of the log package used inside Go
 
 Send bug reports to golang-nuts@googlegroups.com.
 
-
+//TODO:
+1: log file rotation bufio flush sometimes does not work

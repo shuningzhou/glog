@@ -769,18 +769,12 @@ func (l *loggingT) output(s severity, buf *buffer, file string, line int, alsoTo
 		switch s {
 		case fatalLog:
 			l.file[fatalLog].Write(data)
-			fallthrough
 		case errorLog:
 			l.file[errorLog].Write(data)
-			fallthrough
 		case warningLog:
 			l.file[warningLog].Write(data)
-			fallthrough
 		case infoLog:
-			if _, err := l.file[infoLog].Write(data); err != nil {
-				fmt.Fprintln(os.Stderr, "glog: failed to log")
-			}
-
+			l.file[infoLog].Write(data)
 		}
 	}
 	if s == fatalLog {
@@ -1148,14 +1142,27 @@ func (v Verbose) Infof(format string, args ...interface{}) {
 	}
 }
 
+// structured logging
+func InfoStructuredDepth(depth int, arg interface{}) {
+	logging.printDepthEntry(infoLog, depth, arg)
+}
+
+func WarnStructuredDepth(depth int, arg interface{}) {
+	logging.printDepthEntry(warningLog, depth, arg)
+}
+
+func ErrorStructuredDepth(depth int, arg interface{}) {
+	logging.printDepthEntry(errorLog, depth, arg)
+}
+
+func FatelStructuredDepth(depth int, arg interface{}) {
+	logging.printDepthEntry(fatalLog, depth, arg)
+}
+
 // Info logs to the INFO log.
 // Arguments are handled in the manner of fmt.Print; a newline is appended if missing.
 func Info(args ...interface{}) {
 	logging.print(infoLog, args...)
-}
-
-func InfoEntryDepth(depth int, arg interface{}) {
-	logging.printDepthEntry(infoLog, depth, arg)
 }
 
 // InfoDepth acts as Info but uses depth to determine which call frame to log.
