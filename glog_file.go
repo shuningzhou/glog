@@ -84,7 +84,7 @@ func shortHostname(hostname string) string {
 // the name for the symlink for tag.
 func logName(tag string, t time.Time) (name, link string) {
 	name = fmt.Sprintf("%s[%04d-%02d-%02d %02d-%02d-%02d].log",
-		program,
+		program[:len(program)-len(filepath.Ext(program))],
 		t.Year(),
 		t.Month(),
 		t.Day(),
