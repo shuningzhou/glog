@@ -95,9 +95,7 @@ func logName(tag string, t time.Time) (name, link string) {
 }
 
 func logPrefix(tag string) string {
-	return fmt.Sprintf("%s_%s",
-		program,
-		tag)
+	return program[:len(program)-len(filepath.Ext(program))]
 }
 
 var onceLogDirs sync.Once
