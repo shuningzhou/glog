@@ -719,7 +719,8 @@ func (l *loggingT) printDepthEntry(s severity, depth int, arg interface{}) {
 			buf.WriteByte('\n')
 		}
 
-		l.output(s, buf, file, line, false)
+		//structured logs use the same log file
+		l.output(infoLog, buf, file, line, false)
 	}
 }
 
