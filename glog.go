@@ -606,7 +606,7 @@ func (l *loggingT) createEntry(s severity, depth int, entry GLogEntry) (*buffer,
 	b, _ := json.Marshal(fileEntry)
 
 	buf.Write(b)
-	buf.WriteByte(',')
+	//buf.WriteByte(',')
 
 	return buf, file, line
 }
